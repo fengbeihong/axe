@@ -1,0 +1,55 @@
+# 业务自定义的配置
+
+#以下是默认的
+[server]
+#服务名称
+service_name="rpcservername"
+address = "0.0.0.0"
+port = 9900
+http_port = 9901
+
+# todo
+#[log]
+#level="debug"
+
+[metrics]
+type="prometheus"
+enabled=true
+
+[trace]
+type="jaeger"
+enabled=true
+agent_port=6831
+
+[[client]]
+service_name="rpcservername"
+proto="rpc"
+type="consul"
+endpoints="127.0.0.1:9900"
+timeout=1000
+retry_times = 3
+per_retry_timeout=300
+
+[[client]]
+service_name="rpcservername_local"
+proto="rpc"
+type="local"
+endpoints="127.0.0.1:9900"
+timeout=1000
+retry_times = 3
+per_retry_timeout=300
+
+[[client]]
+service_name="rpcservername_http"
+proto="http"
+type="local"
+endpoints="127.0.0.1:9901"
+timeout=1000
+retry_times = 3
+per_retry_timeout=300
+
+#[[redis]]
+# todo
+
+#[[mysql]]
+# todo
