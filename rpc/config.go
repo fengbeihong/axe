@@ -3,6 +3,8 @@ package rpc
 import (
 	"log"
 
+	"github.com/creasty/defaults"
+
 	"github.com/BurntSushi/toml"
 )
 
@@ -82,7 +84,7 @@ type redisConfig struct {
 type dbConfig struct {
 	ServiceName string `toml:"service_name"`
 	Host        string `toml:"host"`
-	Port        int    `toml:"port"`
+	Port        int    `toml:"port" default:"3306"`
 	Username    string `toml:"username"`
 	Password    string `toml:"password"`
 	Database    string `toml:"database"`
@@ -100,5 +102,28 @@ func parseConfig(filePath string) *Config {
 
 func initConfig(filePath string) *Config {
 	GlobalConf = parseConfig(filePath)
+	setDefaultValue(GlobalConf)
 	return GlobalConf
+}
+
+func setDefaultValue(cfg *Config) {
+	ds(&cfg.Server)
+	ds(&cfg.Consul)
+	ds(&cfg.Metrics)
+	ds(&cfg.Trace)
+	for _, item := range cfg.RpcClients {
+		ds(&item)
+	}
+	for _, item := range cfg.DBClients {
+		ds(&item)
+	}
+	for _, item := range cfg.RedisClients {
+		ds(&item)
+	}
+}
+
+func ds(o interface{}) {
+	if err := defaults.Set(o); err != nil {
+		panic(err)
+	}
 }
