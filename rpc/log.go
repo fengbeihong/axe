@@ -5,12 +5,6 @@ import (
 	"os"
 )
 
-var GlobalLogger Logger
-
-func init() {
-	GlobalLogger = newLogger()
-}
-
 type Logger interface {
 	Infof(format string, args ...interface{})
 	Errorf(format string, args ...interface{})
@@ -34,7 +28,7 @@ func (l *logger) Errorf(format string, args ...interface{}) {
 	l.log.Printf("[ERROR] "+format, args...)
 }
 
-func initLogger(opts ...InitOption) {
+func initLogger(cfg *Config, opts ...InitOption) {
 	options := initOptions{
 		logger: newLogger(),
 	}
@@ -43,5 +37,5 @@ func initLogger(opts ...InitOption) {
 		opt.f(&options)
 	}
 
-	GlobalLogger = options.logger
+	cfg.Log = options.logger
 }

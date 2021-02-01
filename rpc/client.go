@@ -16,11 +16,11 @@ func init() {
 	clientConfigMap = make(map[string]*clientConfig)
 }
 
-func initClient(cfg *Config) {
-	for _, item := range cfg.Clients {
+func initRpcClient(cfg *Config) {
+	for _, item := range cfg.RpcClients {
 		if item.CallType == callTypeLocal {
 			if err := item.checkEndpoints(); err != nil {
-				GlobalLogger.Errorf("%v", err)
+				cfg.Log.Errorf("%v", err)
 				continue
 			}
 		}
@@ -29,6 +29,7 @@ func initClient(cfg *Config) {
 	}
 }
 
+// load balancer
 func (c *clientConfig) endpointByBalancer() string {
 	// 暂时没有实现负载均衡
 	if len(c.EndpointsArr) == 0 {

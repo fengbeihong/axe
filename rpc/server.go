@@ -7,20 +7,15 @@ import (
 	"net/http"
 
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
-
-	grpc_recovery "github.com/grpc-ecosystem/go-grpc-middleware/recovery"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-
 	"github.com/grpc-ecosystem/go-grpc-middleware/ratelimit"
-
+	grpc_recovery "github.com/grpc-ecosystem/go-grpc-middleware/recovery"
+	grpc_opentracing "github.com/grpc-ecosystem/go-grpc-middleware/tracing/opentracing"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"google.golang.org/grpc/reflection"
-
-	grpc_opentracing "github.com/grpc-ecosystem/go-grpc-middleware/tracing/opentracing"
-
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/reflection"
+	"google.golang.org/grpc/status"
 )
 
 type Server struct {
@@ -28,11 +23,12 @@ type Server struct {
 	server   *grpc.Server
 	listener net.Listener
 	grpcAddr string
-	logger   Logger
+	httpAddr string
 }
 
 func initServer(cfg *Config) *Server {
-	tcpAddr := fmt.Sprintf("%s:%d", cfg.Server.Address, cfg.Server.Port)
+	tcpAddr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
+	httpAddr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.HttpPort)
 	l, err := net.Listen("tcp", tcpAddr)
 	if err != nil {
 		log.Fatalf("initServer failed, failed to listen: %v", err)
@@ -47,7 +43,7 @@ func initServer(cfg *Config) *Server {
 		server:   s,
 		listener: l,
 		grpcAddr: tcpAddr,
-		logger:   GlobalLogger,
+		httpAddr: httpAddr,
 	}
 
 	return server
@@ -93,21 +89,16 @@ func makeMiddlewareInterceptor(cfg *Config) []grpc.ServerOption {
 	}
 }
 
-func (s *Server) GrpcServerEndpoint() string {
+func (s *Server) GrpcServerAddr() string {
 	return s.grpcAddr
+}
+
+func (s *Server) HttpServerAddr() string {
+	return s.httpAddr
 }
 
 func (s *Server) GrpcServer() *grpc.Server {
 	return s.server
-}
-
-func (s *Server) ServeHttp(handler http.Handler) {
-	if s.conf.Server.HttpPort == 0 {
-		return
-	}
-	httpAddr := fmt.Sprintf("%s:%d", s.conf.Server.Address, s.conf.Server.HttpPort)
-	log.Printf("start http server, service_name: %s, address: %s", s.conf.Server.ServiceName, httpAddr)
-	go http.ListenAndServe(httpAddr, handler)
 }
 
 func (s *Server) Serve(options ...ServeOption) error {
@@ -122,6 +113,7 @@ func (s *Server) Serve(options ...ServeOption) error {
 		}
 	}()
 
+	registerConsul(s.conf)
 	grpc_prometheus.Register(s.server)
 	http.Handle("/metrics", promhttp.Handler())
 

@@ -87,18 +87,18 @@ func httpDo(opt *httpclientOption) ([]byte, error) {
 	}
 	req, err := http.NewRequest(opt.method, url, opt.body)
 	if err != nil {
-		GlobalLogger.Errorf("failed to execute http request, service_name: %s, url: %s, error: %s", opt.serviceName, url, err.Error())
+		GlobalConf.Log.Errorf("failed to execute http request, service_name: %s, url: %s, error: %s", opt.serviceName, url, err.Error())
 		return nil, err
 	}
 	resp, err := c.Do(req)
 	if err != nil {
-		GlobalLogger.Errorf("http request failed, service name: %s, url: %s, error: %s", opt.serviceName, url, err.Error())
+		GlobalConf.Log.Errorf("http request failed, service name: %s, url: %s, error: %s", opt.serviceName, url, err.Error())
 		return nil, err
 	}
 	defer resp.Body.Close()
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		GlobalLogger.Errorf("http request read body failed, service name: %s, url: %s, error: %s", opt.serviceName, url, err.Error())
+		GlobalConf.Log.Errorf("http request read body failed, service name: %s, url: %s, error: %s", opt.serviceName, url, err.Error())
 	}
 
 	return b, nil

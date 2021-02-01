@@ -2,31 +2,99 @@ package rpc
 
 import (
 	"fmt"
+	"log"
 	"time"
 
-	"google.golang.org/grpc/resolver"
+	"github.com/hashicorp/consul/api"
+	_ "github.com/mbobakov/grpc-consul-resolver"
+)
+
+var (
+	consulAgent     *api.Agent
+	consulServiceID string
 )
 
 const (
-	defaultConsulAgentAddr = "127.0.0.1:8500"
-	defaultTTL             = 100
+	defaultConsulHost = "127.0.0.1"
+	defaultInterval   = 5
+	defaultTTL        = 100
 )
 
-func registerConsul(cfg *Config) {
-	ips, _ := LocalIPv4s()
-	err := Register(cfg.Server.ServiceName, ips[0], cfg.Server.Port, defaultConsulAgentAddr, time.Second*10, defaultTTL)
+func registerConsul(cfg *Config) error {
+	if cfg.Consul.Host == "" {
+		cfg.Consul.Host = defaultConsulHost
+	}
+	consulConfig := api.DefaultConfig()
+	consulConfig.Address = cfg.Consul.Host
+	client, err := api.NewClient(consulConfig)
 	if err != nil {
-		fmt.Println(fmt.Errorf("register consul failed, error: %v", err))
+		return fmt.Errorf("wonaming: create consul client error: %v", err)
+	}
+
+	consulAgent = client.Agent()
+	consulServiceID = fmt.Sprintf("%s-%d", cfg.Server.Host, cfg.Server.Port)
+	interval := time.Duration(defaultInterval) * time.Second
+	ttl := time.Duration(defaultTTL) * time.Second
+
+	// async update ttl
+	go asyncUpdateTTL()
+
+	// register service
+	regService := &api.AgentServiceRegistration{
+		ID:      consulServiceID,
+		Name:    cfg.Server.ServiceName,
+		Address: cfg.Server.Host,
+		Port:    cfg.Server.Port,
+	}
+	err = consulAgent.ServiceRegister(regService)
+	if err != nil {
+		return fmt.Errorf("warning: initial register service '%s' host to consul error: %s", cfg.Server.ServiceName, err.Error())
+	}
+
+	// agent service check
+	regCheck := &api.AgentCheckRegistration{
+		ID:        consulServiceID,
+		Name:      cfg.Server.ServiceName,
+		ServiceID: consulServiceID,
+		AgentServiceCheck: api.AgentServiceCheck{
+			Interval: interval.String(),
+			TTL:      ttl.String(),
+			Status:   api.HealthPassing,
+		},
+	}
+	err = consulAgent.CheckRegister(regCheck)
+	if err != nil {
+		return fmt.Errorf("warning: initial register service check to consul error: %s", err.Error())
+	}
+
+	return nil
+}
+
+func asyncUpdateTTL() {
+	ticker := time.NewTicker(defaultInterval)
+	for {
+		<-ticker.C
+		err := consulAgent.UpdateTTL(consulServiceID, "", api.HealthPassing)
+		if err != nil {
+			log.Println("warning: update ttl of service error: ", err.Error())
+		}
 	}
 }
 
-func generateSchema(serviceName string) (schema string, err error) {
-	builder := NewConsulBuilder(defaultConsulAgentAddr)
-	target := resolver.Target{Scheme: builder.Scheme(), Endpoint: serviceName}
-	_, err = builder.Build(target, NewConsulClientConn(), resolver.BuildOptions{})
-	if err != nil {
-		return builder.Scheme(), err
+func deregisterConsul() {
+	if consulAgent == nil {
+		return
 	}
-	schema = builder.Scheme()
-	return
+
+	err := consulAgent.ServiceDeregister(consulServiceID)
+	if err != nil {
+		log.Println("warning: deregister service error: ", err.Error())
+	} else {
+		log.Println("warning: deregister service from consul server.")
+	}
+
+	err = consulAgent.CheckDeregister(consulServiceID)
+	if err != nil {
+		log.Println("warning: deregister check error: ", err.Error())
+	}
 }

@@ -13,10 +13,10 @@ import (
 	"google.golang.org/grpc"
 )
 
-var pools map[string]*grpc.ClientConn
+var grpcPools map[string]*grpc.ClientConn
 
 func init() {
-	pools = make(map[string]*grpc.ClientConn)
+	grpcPools = make(map[string]*grpc.ClientConn)
 }
 
 // DialService for rpc dial
@@ -31,8 +31,8 @@ func DialService(ctx context.Context, serviceName string) (*grpc.ClientConn, err
 	}
 
 	// TODO to optimize
-	if pools[serviceName] != nil {
-		return pools[serviceName], nil
+	if grpcPools[serviceName] != nil {
+		return grpcPools[serviceName], nil
 	}
 
 	opts := makeDialOption(conf)
@@ -50,7 +50,7 @@ func DialService(ctx context.Context, serviceName string) (*grpc.ClientConn, err
 	if err != nil {
 		return nil, err
 	}
-	pools[serviceName] = conn
+	grpcPools[serviceName] = conn
 	return conn, nil
 }
 
@@ -82,18 +82,12 @@ func makeDialOption(conf *clientConfig) []grpc.DialOption {
 }
 
 func dialWithConsul(ctx context.Context, cfg *clientConfig, opts ...grpc.DialOption) (*grpc.ClientConn, error) {
-	schema, err := generateSchema(cfg.ServiceName)
-	if err != nil {
-		GlobalLogger.Errorf("dialWithConsul, init consul resolver error: %s", err.Error())
-		return nil, err
-	}
-
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(cfg.Timeout)*time.Millisecond)
 	defer cancel()
 
-	conn, err := grpc.DialContext(ctx, fmt.Sprintf("%s:///%s", schema, cfg.ServiceName), opts...)
+	conn, err := grpc.DialContext(ctx, fmt.Sprintf("consul://%s:8500/%s", GlobalConf.Consul.Host, cfg.ServiceName), opts...)
 	if err != nil {
-		GlobalLogger.Errorf("dialWithConsul, did not connect: %s", err.Error())
+		GlobalConf.Log.Errorf("dialWithConsul, dial with context failed: %s", err.Error())
 		return nil, err
 	}
 
@@ -106,7 +100,7 @@ func dialWithLocal(ctx context.Context, cfg *clientConfig, opts ...grpc.DialOpti
 
 	conn, err := grpc.DialContext(ctx, cfg.endpointByBalancer(), opts...)
 	if err != nil {
-		GlobalLogger.Errorf("dialWithLocal, did not connect: %s", err.Error())
+		GlobalConf.Log.Errorf("dialWithLocal, dial with context failed: %s", err.Error())
 		return nil, err
 	}
 
