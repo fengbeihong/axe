@@ -3,6 +3,8 @@ package rpc
 import (
 	"log"
 
+	"github.com/creasty/defaults"
+
 	"github.com/BurntSushi/toml"
 )
 
@@ -22,31 +24,41 @@ const (
 )
 
 type Config struct {
-	Server  serverConfig
-	Log     logConfig
-	Metrics metricsConfig
-	Trace   traceConfig
-	Clients []clientConfig `toml:"client"`
+	Log          Logger
+	Pprof        pprofConfig `toml:"pprof"`
+	Server       serverConfig
+	Consul       consulConfig
+	Metrics      metricsConfig
+	Trace        traceConfig
+	RpcClients   []clientConfig `toml:"client"`
+	DBClients    []dbConfig     `toml:"database"`
+	RedisClients []redisConfig  `toml:"redis"`
 }
 
 type serverConfig struct {
 	ServiceName string `toml:"service_name"`
-	Address     string
-	Port        int
-	HttpPort    int `toml:"http_port"`
+	Host        string `toml:"host"`
+	Port        int    `toml:"port"`
+	HttpPort    int    `toml:"http_port"`
 }
 
-type logConfig struct {
+type pprofConfig struct {
+	Port int `toml:"port"`
+}
+
+type consulConfig struct {
+	Enabled bool
+	Host    string `toml:"host"`
 }
 
 type metricsConfig struct {
-	Type    string
 	Enabled bool
+	Type    string
 }
 
 type traceConfig struct {
-	Type      string
 	Enabled   bool
+	Type      string
 	AgentPort int `toml:"agent_port"`
 }
 
@@ -63,6 +75,28 @@ type clientConfig struct {
 	EndpointsArr []string `toml:"-"`
 }
 
+type redisConfig struct {
+	ServiceName  string `toml:"service_name"`
+	Address      string `toml:"address"`
+	Password     string `toml:"password"`
+	DB           int    `toml:"db"`
+	MaxIdle      int    `toml:"max_idle"`
+	IdleTimeout  int    `toml:"idle_timeout"`
+	ConnTimeout  int    `toml:"conn_timeout"`
+	ReadTimeout  int    `toml:"read_timeout"`
+	WriteTimeout int    `toml:"write_timeout"`
+}
+
+type dbConfig struct {
+	ServiceName string `toml:"service_name"`
+	Host        string `toml:"host"`
+	Port        int    `toml:"port" default:"3306"`
+	Username    string `toml:"username"`
+	Password    string `toml:"password"`
+	Database    string `toml:"database"`
+	EnableLog   bool   `toml:"enable_log"`
+}
+
 var GlobalConf *Config
 
 func parseConfig(filePath string) *Config {
@@ -75,5 +109,29 @@ func parseConfig(filePath string) *Config {
 
 func initConfig(filePath string) *Config {
 	GlobalConf = parseConfig(filePath)
+	setDefaultValue(GlobalConf)
 	return GlobalConf
+}
+
+func setDefaultValue(cfg *Config) {
+	ds(cfg)
+	ds(&cfg.Server)
+	ds(&cfg.Consul)
+	ds(&cfg.Metrics)
+	ds(&cfg.Trace)
+	for _, item := range cfg.RpcClients {
+		ds(&item)
+	}
+	for _, item := range cfg.DBClients {
+		ds(&item)
+	}
+	for _, item := range cfg.RedisClients {
+		ds(&item)
+	}
+}
+
+func ds(o interface{}) {
+	if err := defaults.Set(o); err != nil {
+		panic(err)
+	}
 }

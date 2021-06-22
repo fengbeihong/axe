@@ -1,13 +1,23 @@
 package rpc
 
+import "os"
+
+func init() {
+	os.Setenv("GODEBUG", "netdns=go")
+}
+
 func InitRpc(filePath string, opts ...InitOption) *Server {
 	cfg := initConfig(filePath)
 
-	initLogger(opts...)
+	initLogger(cfg, opts...)
 
-	registerConsul(cfg)
+	go onExit()
 
-	initClient(cfg)
+	initRpcClient(cfg)
+
+	initRedisClient(cfg)
+
+	initDBClient(cfg)
 
 	// init rpc server
 	return initServer(cfg)
@@ -16,9 +26,7 @@ func InitRpc(filePath string, opts ...InitOption) *Server {
 func InitRpcSimple(filePath string, opts ...InitOption) {
 	cfg := initConfig(filePath)
 
-	initLogger(opts...)
+	initLogger(cfg, opts...)
 
-	registerConsul(cfg)
-
-	initClient(cfg)
+	initRpcClient(cfg)
 }

@@ -2,18 +2,21 @@ package rpc
 
 import "net"
 
-func LocalIPv4s() ([]string, error) {
-	var ips []string
+// GetLocalIP returns the non loopback local IP of the host
+func GetLocalIP() string {
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {
-		return ips, err
+		return ""
 	}
-
-	for _, a := range addrs {
-		if ipnet, ok := a.(*net.IPNet); ok && !ipnet.IP.IsLoopback() && ipnet.IP.To4() != nil {
-			ips = append(ips, ipnet.IP.String())
+	for _, address := range addrs {
+		// check the address type and if it is not a loopback the display it
+		if ipnet, ok := address.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+			if ipnet.IP.To4() != nil {
+				if ipnet.IP.To4().String() != "127.0.0.1" {
+					return ipnet.IP.String()
+				}
+			}
 		}
 	}
-
-	return ips, nil
+	return ""
 }

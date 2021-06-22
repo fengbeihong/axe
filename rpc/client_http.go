@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -15,26 +16,41 @@ type httpclientOption struct {
 	ctx         context.Context
 	serviceName string
 	uri         string
+	headers     map[string]string
 	body        io.Reader
 }
 
-func HttpGet(ctx context.Context, serviceName string, uri string) ([]byte, error) {
+func HttpGet(ctx context.Context, serviceName string, uri string, headers map[string]string, body ...io.Reader) ([]byte, error) {
+	var b io.Reader
+	if len(body) == 1 {
+		b = body[0]
+	} else {
+		b = nil
+	}
 	return httpOperation(&httpclientOption{
 		method:      "GET",
 		ctx:         ctx,
 		serviceName: serviceName,
 		uri:         uri,
-		body:        nil,
+		body:        b,
+		headers:     headers,
 	})
 }
 
-func HttpPost(ctx context.Context, serviceName string, uri string, body io.Reader) ([]byte, error) {
+func HttpPost(ctx context.Context, serviceName string, uri string, headers map[string]string, body ...io.Reader) ([]byte, error) {
+	var b io.Reader
+	if len(body) == 1 {
+		b = body[0]
+	} else {
+		b = nil
+	}
 	return httpOperation(&httpclientOption{
 		method:      "POST",
 		ctx:         ctx,
 		serviceName: serviceName,
 		uri:         uri,
-		body:        body,
+		body:        b,
+		headers:     headers,
 	})
 }
 
@@ -79,7 +95,11 @@ func httpDoWithRetry(opt *httpclientOption) (b []byte, err error) {
 func httpDo(opt *httpclientOption) ([]byte, error) {
 	domain := opt.cfg.endpointByBalancer()
 
-	url := fmt.Sprintf("http://%s%s", domain, opt.uri)
+	if !strings.HasPrefix(domain, "http://") && !strings.HasPrefix(domain, "https://") {
+		domain = "http://" + domain
+	}
+
+	url := domain + opt.uri
 
 	c := &http.Client{
 		Timeout:   time.Duration(opt.cfg.RetryTimeout) * time.Millisecond,
@@ -87,18 +107,28 @@ func httpDo(opt *httpclientOption) ([]byte, error) {
 	}
 	req, err := http.NewRequest(opt.method, url, opt.body)
 	if err != nil {
-		GlobalLogger.Errorf("failed to execute http request, service_name: %s, url: %s, error: %s", opt.serviceName, url, err.Error())
+		GlobalConf.Log.Errorf("failed to execute http request, service_name: %s, url: %s, error: %s", opt.serviceName, url, err.Error())
 		return nil, err
 	}
+
+	req.Header.Set("Content-Type", "application/json")
+	for k, v := range opt.headers {
+		req.Header.Set(k, v)
+	}
+
 	resp, err := c.Do(req)
 	if err != nil {
-		GlobalLogger.Errorf("http request failed, service name: %s, url: %s, error: %s", opt.serviceName, url, err.Error())
+		GlobalConf.Log.Errorf("http request failed, service name: %s, url: %s, error: %s", opt.serviceName, url, err.Error())
 		return nil, err
+	}
+	if resp.StatusCode >= http.StatusBadRequest {
+		GlobalConf.Log.Errorf("http request failed, service name: %s, url: %s, code: %d, status: %s", opt.serviceName, url, resp.StatusCode, resp.Status)
+		return nil, fmt.Errorf("%d:%s", resp.StatusCode, resp.Status)
 	}
 	defer resp.Body.Close()
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		GlobalLogger.Errorf("http request read body failed, service name: %s, url: %s, error: %s", opt.serviceName, url, err.Error())
+		GlobalConf.Log.Errorf("http request read body failed, service name: %s, url: %s, error: %s", opt.serviceName, url, err.Error())
 	}
 
 	return b, nil

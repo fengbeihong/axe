@@ -2,10 +2,9 @@
 
 ### 安装依赖
 
-##### grpc-gateway
+##### protoc和swagger的生成脚本
 ```
 go install \
-    github.com/grpc-ecosystem/grpc-gateway/protoc-gen-grpc-gateway \
     github.com/grpc-ecosystem/grpc-gateway/protoc-gen-swagger \
     github.com/golang/protobuf/protoc-gen-go
 ```
@@ -42,7 +41,6 @@ PB_PATH=$GOPATH/src/github.com/fengbeihong/rpc-go/demo/pb
 cd $PB_PATH
 
 protoc -I $GOPATH/src -I $PB_PATH/ --go_out=plugins=grpc:$PB_PATH/ $PB_PATH/echo.proto
-protoc -I $GOPATH/src -I $PB_PATH/ --grpc-gateway_out=logtostderr=true:$PB_PATH/ $PB_PATH/echo.proto
 protoc -I $GOPATH/src -I $PB_PATH/ --swagger_out=logtostderr=true:$PB_PATH/ $PB_PATH/echo.proto
 ```
 
