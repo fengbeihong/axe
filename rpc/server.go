@@ -185,5 +185,14 @@ func (s *Server) Serve(options ...ServeOption) error {
 	}
 
 	reflection.Register(s.server)
-	return s.server.Serve(s.listenerGrpc.Listener)
+	go func() {
+		err := s.server.Serve(s.listenerGrpc.Listener)
+		if err != nil {
+			log.Println("grpc serve failed, error:", err.Error())
+		}
+	}()
+
+	onExit(onSignal())
+
+	return nil
 }

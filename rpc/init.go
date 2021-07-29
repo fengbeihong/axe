@@ -11,8 +11,6 @@ func InitRpc(filePath string, opts ...InitOption) *Server {
 
 	initLogger(cfg, opts...)
 
-	go onExit()
-
 	initRpcClient(cfg)
 
 	initRedisClient(cfg)
