@@ -16,11 +16,11 @@ func init() {
 	clientConfigMap = make(map[string]*clientConfig)
 }
 
-func initRpcClient(cfg *Config) {
-	for _, item := range cfg.RpcClients {
+func initRpcClient(s *Server) {
+	for _, item := range s.cfg.RpcClients {
 		if item.CallType == callTypeLocal {
 			if err := item.checkEndpoints(); err != nil {
-				cfg.Log.Errorf("%v", err)
+				s.Log.Error(err.Error())
 				continue
 			}
 		}

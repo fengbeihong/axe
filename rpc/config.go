@@ -24,7 +24,6 @@ const (
 )
 
 type Config struct {
-	Log          Logger
 	Pprof        pprofConfig `toml:"pprof"`
 	Server       serverConfig
 	Consul       consulConfig

@@ -26,9 +26,9 @@ func registerConsul(cfg *Config) error {
 	if cfg.Consul.Host == "" {
 		cfg.Consul.Host = defaultConsulHost
 	}
-	consulConfig := api.DefaultConfig()
-	consulConfig.Address = fmt.Sprintf("%s:8500", cfg.Consul.Host)
-	client, err := api.NewClient(consulConfig)
+	cc := api.DefaultConfig()
+	cc.Address = fmt.Sprintf("%s:8500", cfg.Consul.Host)
+	client, err := api.NewClient(cc)
 	if err != nil {
 		return fmt.Errorf("waring: create consul client error: %v", err)
 	}

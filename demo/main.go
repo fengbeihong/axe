@@ -31,10 +31,12 @@ func EchoWithHttpWrapper(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	var reqData pb.EchoRequest
-	err = json.Unmarshal(data, &reqData)
-	if err != nil {
-		w.Write([]byte(err.Error()))
-		return
+	if len(data) != 0 {
+		err = json.Unmarshal(data, &reqData)
+		if err != nil {
+			w.Write([]byte(err.Error()))
+			return
+		}
 	}
 	var es echoServer
 	respData, err := es.Echo(context.Background(), &reqData)
@@ -57,11 +59,11 @@ func EchoWithHttpWrapper(w http.ResponseWriter, req *http.Request) {
 type MyLogger struct {
 }
 
-func (m *MyLogger) Infof(format string, args ...interface{}) {
+func (m *MyLogger) Info(format string, args ...interface{}) {
 	log.Printf(format, args...)
 }
 
-func (m *MyLogger) Errorf(format string, args ...interface{}) {
+func (m *MyLogger) Error(format string, args ...interface{}) {
 	log.Printf(format, args...)
 }
 
@@ -72,15 +74,16 @@ func getCurrentFilePath() string {
 	return filePath
 }
 func main() {
-	s := rpc.InitRpc(path.Join(path.Dir(getCurrentFilePath()), "rpc.toml"), rpc.WithLogger(&MyLogger{}))
+	cfgPath := path.Join(path.Dir(getCurrentFilePath()), "rpc.toml")
+	s, _ := rpc.InitRpc(cfgPath, rpc.WithLogger(&MyLogger{}))
 	// 也可以使用默认logger
 	// s := rpc.InitRpc("./rpc.toml")
 
 	// register rpc
 	pb.RegisterEchoServiceServer(s.GrpcServer(), &echoServer{})
 
-	http.HandleFunc("/echo/", EchoWithHttpWrapper)
-	go http.ListenAndServe(s.HttpServerAddr(), nil)
+	http.HandleFunc("/echo", EchoWithHttpWrapper)
+	go http.ListenAndServe(s.HttpAddr(), nil)
 
 	// 调用client的例子
 	go clientExample()
@@ -92,7 +95,7 @@ func main() {
 
 func clientExample() {
 	time.Sleep(time.Duration(2) * time.Second)
-	clientExampleRpcConsul()
+	//clientExampleRpcConsul()
 	clientExampleRpcLocal()
 	clientExampleHttpLocal()
 }
@@ -140,7 +143,7 @@ func clientExampleHttpLocal() {
 	}
 	bb, _ := json.Marshal(data)
 	body := bytes.NewReader(bb)
-	b, err := rpc.HttpPost(context.Background(), "rpcservername_http", "/v1/example/echo", nil, body)
+	b, err := rpc.HttpPost(context.Background(), "rpcservername_http", "/echo", nil, body)
 	if err != nil {
 		log.Println("clientExampleHttpLocal error: ", err)
 		return

@@ -18,11 +18,11 @@ type traceLogger struct {
 }
 
 func (l *traceLogger) Infof(format string, args ...interface{}) {
-	GlobalConf.Log.Infof("[INFO] "+format, args...)
+	gLogger.Info("[INFO] "+format, args...)
 }
 
 func (l *traceLogger) Error(msg string) {
-	GlobalConf.Log.Errorf(msg)
+	gLogger.Error(msg)
 }
 
 func initJaeger(rpcConf *Config) opentracing.Tracer {
@@ -47,7 +47,7 @@ func initJaeger(rpcConf *Config) opentracing.Tracer {
 		jaegercfg.Metrics(metrics.NullFactory),
 	)
 	if t == nil || closer == nil || err != nil {
-		GlobalConf.Log.Errorf("could not initialize jaeger tracer, tracer: %v, closer: %v, error: %v", t, closer, err)
+		gLogger.Error("could not initialize jaeger tracer, tracer: %v, closer: %v, error: %v", t, closer, err)
 		return nil
 	}
 	GlobalTraceCloser = closer

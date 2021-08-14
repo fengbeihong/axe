@@ -3,28 +3,42 @@ package rpc
 import "os"
 
 func init() {
+	// https://developer.aliyun.com/article/238940
+	// http://tbg.github.io/golang-static-linking-bug?spm=a2c6h.12873639.0.0.52933341DDCBdG
 	os.Setenv("GODEBUG", "netdns=go")
 }
 
-func InitRpc(filePath string, opts ...InitOption) *Server {
-	cfg := initConfig(filePath)
+func InitRpc(filePath string, opts ...InitOption) (*Server, error) {
+	s := &Server{
+		cfg: initConfig(filePath),
+		Log: defaultLogger(),
+	}
 
-	initLogger(cfg, opts...)
+	for _, opt := range opts {
+		opt.f(s)
+	}
 
-	initRpcClient(cfg)
+	setGLogger(s.Log)
 
-	initRedisClient(cfg)
+	initRpcClient(s)
 
-	initDBClient(cfg)
+	initRedisClient(s)
 
-	// init rpc server
-	return initServer(cfg)
+	initDBClient(s)
+
+	// init grpc server
+	s.server = initGrpcServer(s.cfg)
+
+	return s, s.Err
 }
 
-func InitRpcSimple(filePath string, opts ...InitOption) {
-	cfg := initConfig(filePath)
+type InitOption struct {
+	f func(*Server)
+}
 
-	initLogger(cfg, opts...)
-
-	initRpcClient(cfg)
+// WithLogger init logger
+func WithLogger(l Logger) InitOption {
+	return InitOption{func(s *Server) {
+		s.Log = l
+	}}
 }

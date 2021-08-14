@@ -5,17 +5,20 @@ import (
 	"testing"
 )
 
-var mysqlTestConfig = &Config{
-	DBClients: []dbConfig{
-		{
-			ServiceName: "test",
-			Host:        "127.0.0.1",
-			Port:        3306,
-			Username:    "root",
-			Password:    "aaaaaaaa",
-			Database:    "test",
+var mysqlTestConfig = &Server{
+	cfg: &Config{
+		DBClients: []dbConfig{
+			{
+				ServiceName: "test",
+				Host:        "127.0.0.1",
+				Port:        3306,
+				Username:    "root",
+				Password:    "aaaaaaaa",
+				Database:    "test",
+			},
 		},
 	},
+	Log: defaultLogger(),
 }
 
 func TestMysqlConn(t *testing.T) {

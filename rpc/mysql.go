@@ -3,7 +3,6 @@ package rpc
 import (
 	"context"
 	"fmt"
-	"log"
 	"sync"
 
 	"gorm.io/driver/mysql"
@@ -35,13 +34,13 @@ func loadDB(key string) *DBInfo {
 	return nil
 }
 
-func initDBClient(globalCfg *Config) {
-	for _, dbCfg := range globalCfg.DBClients {
+func initDBClient(s *Server) {
+	for _, dbCfg := range s.cfg.DBClients {
 		cfg := dbCfg
 		info, err := initDB(&cfg)
 		if err != nil {
-			// 服务启动阶段链接不上db就直接fatal
-			log.Fatalf(err.Error())
+			s.Log.Error(err.Error())
+			continue
 		}
 		globalDBMap.Store(cfg.ServiceName, info)
 	}

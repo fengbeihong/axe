@@ -87,8 +87,7 @@ func dialWithConsul(ctx context.Context, cfg *clientConfig, opts ...grpc.DialOpt
 
 	conn, err := grpc.DialContext(ctx, fmt.Sprintf("consul://%s:8500/%s", GlobalConf.Consul.Host, cfg.ServiceName), opts...)
 	if err != nil {
-		GlobalConf.Log.Errorf("dialWithConsul, dial with context failed: %s", err.Error())
-		return nil, err
+		return nil, fmt.Errorf("dialWithConsul, dial with context failed: %s", err.Error())
 	}
 
 	return conn, nil
@@ -100,8 +99,7 @@ func dialWithLocal(ctx context.Context, cfg *clientConfig, opts ...grpc.DialOpti
 
 	conn, err := grpc.DialContext(ctx, cfg.endpointByBalancer(), opts...)
 	if err != nil {
-		GlobalConf.Log.Errorf("dialWithLocal, dial with context failed: %s", err.Error())
-		return nil, err
+		return nil, fmt.Errorf("dialWithLocal, dial with context failed: %s", err.Error())
 	}
 
 	return conn, nil

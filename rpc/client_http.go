@@ -107,8 +107,7 @@ func httpDo(opt *httpclientOption) ([]byte, error) {
 	}
 	req, err := http.NewRequest(opt.method, url, opt.body)
 	if err != nil {
-		GlobalConf.Log.Errorf("failed to execute http request, service_name: %s, url: %s, error: %s", opt.serviceName, url, err.Error())
-		return nil, err
+		return nil, fmt.Errorf("failed to execute http request, service_name: %s, url: %s, error: %s", opt.serviceName, url, err.Error())
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -118,17 +117,15 @@ func httpDo(opt *httpclientOption) ([]byte, error) {
 
 	resp, err := c.Do(req)
 	if err != nil {
-		GlobalConf.Log.Errorf("http request failed, service name: %s, url: %s, error: %s", opt.serviceName, url, err.Error())
-		return nil, err
+		return nil, fmt.Errorf("http request failed, service name: %s, url: %s, error: %s", opt.serviceName, url, err.Error())
 	}
 	if resp.StatusCode >= http.StatusBadRequest {
-		GlobalConf.Log.Errorf("http request failed, service name: %s, url: %s, code: %d, status: %s", opt.serviceName, url, resp.StatusCode, resp.Status)
-		return nil, fmt.Errorf("%d:%s", resp.StatusCode, resp.Status)
+		return nil, fmt.Errorf("http request failed, service name: %s, url: %s, code: %d, status: %s", opt.serviceName, url, resp.StatusCode, resp.Status)
 	}
 	defer resp.Body.Close()
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		GlobalConf.Log.Errorf("http request read body failed, service name: %s, url: %s, error: %s", opt.serviceName, url, err.Error())
+		return nil, fmt.Errorf("http request read body failed, service name: %s, url: %s, error: %s", opt.serviceName, url, err.Error())
 	}
 
 	return b, nil

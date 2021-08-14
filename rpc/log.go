@@ -5,37 +5,35 @@ import (
 	"os"
 )
 
+var gLogger Logger
+
 type Logger interface {
-	Infof(format string, args ...interface{})
-	Errorf(format string, args ...interface{})
+	Info(format string, args ...interface{})
+	Error(format string, args ...interface{})
 }
 
-func newLogger() Logger {
-	return &logger{
+func init()  {
+	setGLogger(defaultLogger())
+}
+
+func setGLogger(l Logger)  {
+	gLogger = l
+}
+
+func defaultLogger() Logger {
+	return &myLogger{
 		log: log.New(os.Stdout, "[rpc] ", log.LstdFlags),
 	}
 }
 
-type logger struct {
+type myLogger struct {
 	log *log.Logger
 }
 
-func (l *logger) Infof(format string, args ...interface{}) {
+func (l *myLogger) Info(format string, args ...interface{}) {
 	l.log.Printf("[INFO] "+format, args...)
 }
 
-func (l *logger) Errorf(format string, args ...interface{}) {
+func (l *myLogger) Error(format string, args ...interface{}) {
 	l.log.Printf("[ERROR] "+format, args...)
-}
-
-func initLogger(cfg *Config, opts ...InitOption) {
-	options := initOptions{
-		logger: newLogger(),
-	}
-
-	for _, opt := range opts {
-		opt.f(&options)
-	}
-
-	cfg.Log = options.logger
 }

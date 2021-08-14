@@ -1,9 +1,7 @@
 package rpc
 
 import (
-	"errors"
 	"fmt"
-	"log"
 	"net"
 	"net/http"
 	_ "net/http/pprof"
@@ -21,48 +19,15 @@ import (
 )
 
 type Server struct {
-	conf         *Config
-	server       *grpc.Server
-	listenerGrpc ListenerWrap
-	listenerHttp ListenerWrap
+	cfg         *Config
+	server      *grpc.Server
+	Log         Logger
+	Err         error
 }
 
-type ListenerWrap struct {
-	Type     string
-	Listener net.Listener
-	Error    error
-	Addr     string
-}
-
-func initServer(cfg *Config) *Server {
-	server := &Server{
-		conf:         cfg,
-		listenerGrpc: ListenerWrap{Type: "grpc"},
-		listenerHttp: ListenerWrap{Type: "http"},
-	}
-
-	// grpc
-	server.listenerGrpc.Addr = fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
-	server.listenerGrpc.Listener, server.listenerGrpc.Error = net.Listen("tcp", server.listenerGrpc.Addr)
-	if server.listenerGrpc.Error != nil {
-		return server
-	}
-	log.Printf("start rpc server, service_name: %s, address: %s", cfg.Server.ServiceName, server.listenerGrpc.Addr)
-
-	// http
-	server.listenerHttp.Addr = fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.HttpPort)
-	if hasSetHttpPort(cfg) { // 0是没有配置http_port，可以不启动，非0则认为必须启动成功http端口
-		server.listenerHttp.Listener, server.listenerHttp.Error = net.Listen("tcp", server.listenerHttp.Addr)
-		if server.listenerHttp.Error != nil {
-			return server
-		}
-		log.Printf("start http server, service_name: %s, address: %s", cfg.Server.ServiceName, server.listenerHttp.Addr)
-	}
-
-	serverOption := makeMiddlewareInterceptor(cfg)
-	server.server = grpc.NewServer(serverOption...)
-
-	return server
+func initGrpcServer(cfg *Config) *grpc.Server {
+	opts := makeMiddlewareInterceptor(cfg)
+	return grpc.NewServer(opts...)
 }
 
 func makeMiddlewareInterceptor(cfg *Config) []grpc.ServerOption {
@@ -105,58 +70,25 @@ func makeMiddlewareInterceptor(cfg *Config) []grpc.ServerOption {
 	}
 }
 
-func (s *Server) GrpcServerAddr() string {
-	return s.listenerGrpc.Addr
+func (s *Server) GrpcAddr() string {
+	return fmt.Sprintf("%s:%d", s.cfg.Server.Host, s.cfg.Server.Port)
 }
 
-func (s *Server) HttpServerAddr() string {
-	return s.listenerHttp.Addr
-}
-
-func (s *Server) GrpcListener() net.Listener {
-	return s.listenerGrpc.Listener
-}
-
-func (s *Server) HttpListener() net.Listener {
-	return s.listenerHttp.Listener
+func (s *Server) HttpAddr() string {
+	return fmt.Sprintf("%s:%d", s.cfg.Server.Host, s.cfg.Server.HttpPort)
 }
 
 func (s *Server) GrpcServer() *grpc.Server {
 	return s.server
 }
 
-func (s *Server) Error() error {
-	if s.listenerHttp.Error != nil || s.listenerGrpc.Error != nil {
-		return s.handleError()
-	}
-	return nil
-}
-
-func hasSetHttpPort(cfg *Config) bool {
-	return cfg.Server.HttpPort != 0
-}
-
-func (s *Server) handleError() error {
-	errMsg := "grpc server is nil, %s net.Listen failed, %s addr:[%s], error:%s"
-	var lw ListenerWrap
-	if hasSetHttpPort(s.conf) {
-		// 没有设置http port，
-		lw = s.listenerGrpc
-	} else {
-		if s.listenerGrpc.Error != nil {
-			lw = s.listenerGrpc
-		}
-		if s.listenerHttp.Error != nil {
-			lw = s.listenerHttp
-		}
-	}
-	errMsg = fmt.Sprintf(errMsg, lw.Type, lw.Type, lw.Addr, lw.Error)
-	return errors.New(errMsg)
-}
-
 func (s *Server) Serve(options ...ServeOption) error {
-	if s.server == nil {
-		return s.handleError()
+	if s == nil || s.server == nil {
+		return fmt.Errorf("grpc server is nil")
+	}
+
+	if s.Err != nil {
+		return s.Err
 	}
 
 	do := serveOptions{}
@@ -170,29 +102,50 @@ func (s *Server) Serve(options ...ServeOption) error {
 		}
 	}()
 
-	// 只有非dev环境，并且开关打开，才执行consul的注册和metrics的监听
-	if s.conf.Consul.Enabled {
-		registerConsul(s.conf)
+	// init listener
+	lis, err := net.Listen("tcp", s.GrpcAddr())
+	if err != nil {
+		s.Log.Error("grpc listen with addr [%s] failed, error: ", err.Error())
+		return err
 	}
 
-	if s.conf.Metrics.Enabled {
+	// 只有非dev环境，并且开关打开，才执行consul的注册和metrics的监听
+	if s.cfg.Consul.Enabled {
+		if err := registerConsul(s.cfg); err != nil {
+			s.Log.Error("register consul failed, error: %s", err.Error())
+		}
+	}
+
+	if s.cfg.Metrics.Enabled {
 		grpc_prometheus.Register(s.server)
 		http.Handle("/metrics", promhttp.Handler())
 	}
 
-	if s.conf.Pprof.Port != 0 {
-		go http.ListenAndServe(fmt.Sprintf(":%d", s.conf.Pprof.Port), nil)
+	if s.cfg.Pprof.Port != 0 {
+		go func() {
+			if err := http.ListenAndServe(fmt.Sprintf(":%d", s.cfg.Pprof.Port), nil); err != nil {
+				s.Log.Error("init pprof with port [%d] failed, error: %s", s.cfg.Pprof.Port, err.Error())
+			}
+		}()
 	}
 
 	reflection.Register(s.server)
 	go func() {
-		err := s.server.Serve(s.listenerGrpc.Listener)
+		err := s.server.Serve(lis)
 		if err != nil {
-			log.Println("grpc serve failed, error:", err.Error())
+			s.Log.Error("grpc server serve failed, error: %s", err.Error())
 		}
 	}()
 
 	onExit(onSignal())
 
 	return nil
+}
+
+type ServeOption struct {
+	f func(*serveOptions)
+}
+
+type serveOptions struct {
+	// TODO
 }
