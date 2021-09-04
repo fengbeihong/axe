@@ -1,6 +1,9 @@
 package rpc
 
-import "os"
+import (
+	_ "go.uber.org/automaxprocs"
+	"os"
+)
 
 func init() {
 	// https://developer.aliyun.com/article/238940

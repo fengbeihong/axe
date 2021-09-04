@@ -30,6 +30,7 @@ func initGrpcServer(cfg *Config) *grpc.Server {
 	return grpc.NewServer(opts...)
 }
 
+// makeMiddlewareInterceptor Sending unary almost always faster. Use streaming to send big files.
 func makeMiddlewareInterceptor(cfg *Config) []grpc.ServerOption {
 	var siList []grpc.StreamServerInterceptor
 	var uiList []grpc.UnaryServerInterceptor
