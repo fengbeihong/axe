@@ -19,10 +19,10 @@ import (
 )
 
 type Server struct {
-	cfg         *Config
-	server      *grpc.Server
-	Log         Logger
-	Err         error
+	cfg    *Config
+	server *grpc.Server
+	Log    Logger
+	Err    error
 }
 
 func initGrpcServer(cfg *Config) *grpc.Server {
@@ -52,9 +52,11 @@ func makeMiddlewareInterceptor(cfg *Config) []grpc.ServerOption {
 	}
 
 	// rate limit
-	limiter := &alwaysPassLimiter{}
-	siList = append(siList, ratelimit.StreamServerInterceptor(limiter))
-	uiList = append(uiList, ratelimit.UnaryServerInterceptor(limiter))
+	if cfg.RateLimit.Enabled {
+		limiter := initRateLimit(cfg)
+		siList = append(siList, ratelimit.StreamServerInterceptor(limiter))
+		uiList = append(uiList, ratelimit.UnaryServerInterceptor(limiter))
+	}
 
 	// panic recovery
 	opts := []grpc_recovery.Option{

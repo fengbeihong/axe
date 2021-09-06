@@ -26,6 +26,7 @@ const (
 type Config struct {
 	Pprof        pprofConfig `toml:"pprof"`
 	Server       serverConfig
+	RateLimit    rateLimitConfig `toml:"rate_limit"`
 	Consul       consulConfig
 	Metrics      metricsConfig
 	Trace        traceConfig
@@ -39,6 +40,13 @@ type serverConfig struct {
 	Host        string `toml:"host"`
 	Port        int    `toml:"port"`
 	HttpPort    int    `toml:"http_port"`
+}
+
+type rateLimitConfig struct {
+	Enabled      bool
+	Type         string `toml:"type" default:"always_pass"`
+	FillInterval int    `toml:"fill_interval" default:"300"`
+	Capacity     int64  `toml:"capacity" default:"3000"`
 }
 
 type pprofConfig struct {
