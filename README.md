@@ -1,5 +1,3 @@
-## 说明
-
 ### 安装依赖
 
 ##### protoc和swagger的生成脚本
@@ -64,3 +62,8 @@ go run main.go
 ```
 curl -XPOST --data '{"value":"testvalue"}' http://localhost:9901/v1/example/echo
 ```
+
+### TODO
+- 自定义protoc-gen-go工具，可以通过普通的proto文件，同时生成grpc的操作方法和启动http服务的操作方法
+- swagger集成到服务内，只要启动服务，直接访问url即可获取接口描述信息
+- 使用endpoint调用依赖服务时的负载均衡功能
