@@ -4,52 +4,21 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"io/ioutil"
 	"log"
-	"net/http"
 	"path"
 	"runtime"
 	"time"
 
 	pb "github.com/fengbeihong/rpc-go/demo/pb"
-
 	"github.com/fengbeihong/rpc-go/rpc"
 )
 
 type echoServer struct {
+	pb.UnsafeEchoServiceServer
 }
 
 func (s *echoServer) Echo(ctx context.Context, req *pb.EchoRequest) (*pb.EchoResponse, error) {
 	return &pb.EchoResponse{Value: req.GetValue()}, nil
-}
-
-func EchoWithHttpWrapper(w http.ResponseWriter, req *http.Request) {
-	data, err := ioutil.ReadAll(req.Body)
-	defer req.Body.Close()
-	if err != nil {
-		w.Write([]byte(err.Error()))
-		return
-	}
-	var reqData pb.EchoRequest
-	if len(data) != 0 {
-		err = json.Unmarshal(data, &reqData)
-		if err != nil {
-			w.Write([]byte(err.Error()))
-			return
-		}
-	}
-	var es echoServer
-	respData, err := es.Echo(context.Background(), &reqData)
-	if err != nil {
-		w.Write([]byte(err.Error()))
-		return
-	}
-	b, err := json.Marshal(respData)
-	if err != nil {
-		w.Write([]byte(err.Error()))
-		return
-	}
-	w.Write(b)
 }
 
 /////////////////////////////
@@ -73,29 +42,24 @@ func getCurrentFilePath() string {
 	_, filePath, _, _ := runtime.Caller(1)
 	return filePath
 }
+
 func main() {
 	cfgPath := path.Join(path.Dir(getCurrentFilePath()), "rpc.toml")
 
-	// grpc server自定义生成
-	// TODO http server也自定义生成
-	s, _ := rpc.InitRpc(cfgPath, rpc.WithLogger(&MyLogger{}))
 	// 也可以使用默认logger
-	// s := rpc.InitRpc("./rpc.toml")
+	// s, _ := rpc.InitRpc(cfgPath)
+	s, err := rpc.NewServer(cfgPath, rpc.WithLogger(&MyLogger{}))
+	if err != nil {
+		log.Fatalf("failed to new server: %s", err.Error())
+	}
 
 	// register rpc
-	// 注册rpc server只能传grpc server对象
-	// TODO 所以注册http server需要再单独出一个register方法，还是要人手动调用
 	pb.RegisterEchoServiceServer(s.GrpcServer(), &echoServer{})
-
-	// TODO 这些代码，应该直接在pb.go里生成，放在http的register方法里
-	// TODO wrapper方法，最终调用的是echoServer的Echo
-	http.HandleFunc("/echo", EchoWithHttpWrapper)
-
-	// TODO 由上面的http server提供一个类似于grpc server的serve方法
-	go http.ListenAndServe(s.HttpAddr(), nil)
+	// register http, pattern和handler会自动生成
+	pb.RegisterEchoServiceHttpServer(s.HttpServer(), &echoServer{})
 
 	// 调用client的例子
-	go clientExample()
+	//go clientExample()
 
 	if err := s.Serve(); err != nil {
 		log.Fatalf("failed to serve: %v", err)

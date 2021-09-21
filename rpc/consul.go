@@ -39,7 +39,7 @@ func registerConsul(cfg *Config) error {
 	}
 
 	consulAgent = client.Agent()
-	consulServiceID = fmt.Sprintf("%s-%d", agentIP, cfg.Server.Port)
+	consulServiceID = fmt.Sprintf("%s-%d", agentIP, cfg.Server.GrpcPort)
 	consulCheckID = consulServiceID + "-ttl"
 
 	// register service
@@ -47,7 +47,7 @@ func registerConsul(cfg *Config) error {
 		ID:      consulServiceID,
 		Name:    cfg.Server.ServiceName,
 		Address: agentIP,
-		Port:    cfg.Server.Port,
+		Port:    cfg.Server.GrpcPort,
 	}
 
 	err = consulAgent.ServiceRegister(regService)

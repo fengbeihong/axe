@@ -4,7 +4,7 @@ package pb
 
 import (
 	context "context"
-	"encoding/json"
+	json "encoding/json"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -103,7 +103,9 @@ var EchoService_ServiceDesc = grpc.ServiceDesc{
 	Metadata: "pb/echo.proto",
 }
 
-func RegisterEchoServiceHttpServer(srv EchoServiceServer) {
+func RegisterEchoServiceHttpServer(s *http.Server, srv EchoServiceServer) {
+	mux := http.NewServeMux()
+
 	_EchoService_Echo_Http_Handler := func(w http.ResponseWriter, req *http.Request) {
 		data, err := ioutil.ReadAll(req.Body)
 		defer req.Body.Close()
@@ -131,6 +133,7 @@ func RegisterEchoServiceHttpServer(srv EchoServiceServer) {
 		}
 		w.Write(b)
 	}
+	mux.HandleFunc("/EchoService/Echo", _EchoService_Echo_Http_Handler)
 
-	http.HandleFunc("/EchoService/Echo", _EchoService_Echo_Http_Handler)
+	s.Handler = mux
 }

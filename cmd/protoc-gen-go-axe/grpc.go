@@ -32,6 +32,7 @@ const (
 	contextPackage = protogen.GoImportPath("context")
 	httpPackage    = protogen.GoImportPath("net/http")
 	ioutilPackage  = protogen.GoImportPath("io/ioutil")
+	jsonPackage    = protogen.GoImportPath("encoding/json")
 	grpcPackage    = protogen.GoImportPath("google.golang.org/grpc")
 	codesPackage   = protogen.GoImportPath("google.golang.org/grpc/codes")
 	statusPackage  = protogen.GoImportPath("google.golang.org/grpc/status")
@@ -72,11 +73,17 @@ func generateFileContent(gen *protogen.Plugin, file *protogen.File, g *protogen.
 func genHttpService(gen *protogen.Plugin, file *protogen.File, g *protogen.GeneratedFile, service *protogen.Service) {
 	serverType := service.GoName + "Server"
 
-	g.P("func Register", service.GoName, "HttpServer(srv ", serverType, ") {")
+	g.P("func Register", service.GoName, "HttpServer(s *", httpPackage.Ident("Server"), ",srv ", serverType, ") {")
+
+	g.P("mux := ", httpPackage.Ident("NewServeMux"), "()")
+	g.P()
+
 	for _, method := range service.Methods {
 		hname := genHttpServerMethod(gen, file, g, method)
-		g.P(httpPackage.Ident("HandleFunc"), "(", strconv.Quote(fmt.Sprintf("/%s/%s", service.Desc.FullName(), method.Desc.Name())), ", ", hname, ")")
+		g.P("mux.HandleFunc(", strconv.Quote(fmt.Sprintf("/%s/%s", service.Desc.FullName(), method.Desc.Name())), ", ", hname, ")")
+		g.P()
 	}
+	g.P("s.Handler = mux")
 	g.P("}")
 	g.P()
 }
@@ -95,7 +102,7 @@ func genHttpServerMethod(gen *protogen.Plugin, file *protogen.File, g *protogen.
 
 	g.P("var reqData EchoRequest")
 	g.P("if len(data) != 0 {")
-	g.P("err = json.Unmarshal(data, &reqData)")
+	g.P("err = ", jsonPackage.Ident("Unmarshal"), "(data, &reqData)")
 	g.P("if err != nil {")
 	g.P("w.Write([]byte(err.Error()))")
 	g.P("return")
@@ -108,14 +115,13 @@ func genHttpServerMethod(gen *protogen.Plugin, file *protogen.File, g *protogen.
 	g.P("return")
 	g.P("}")
 
-	g.P("b, err := json.Marshal(respData)")
+	g.P("b, err := ", jsonPackage.Ident("Marshal"), "(respData)")
 	g.P("if err != nil {")
 	g.P("w.Write([]byte(err.Error()))")
 	g.P("return")
 	g.P("}")
 	g.P("w.Write(b)")
 	g.P("}")
-	g.P("")
 
 	return hname
 }

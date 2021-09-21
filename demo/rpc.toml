@@ -5,7 +5,7 @@ env="dev"
 #服务名称
 service_name="rpcservername"
 address = "0.0.0.0"
-port = 9900
+grpc_port = 9900
 http_port = 9901
 
 [pprof]

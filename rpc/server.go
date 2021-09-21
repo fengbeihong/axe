@@ -19,15 +19,76 @@ import (
 )
 
 type Server struct {
-	cfg    *Config
-	server *grpc.Server
-	Log    Logger
-	Err    error
+	cfg *Config
+	hs  *httpServer
+	gs  *grpcServer
+	Log Logger
+	Err error
 }
 
-func initGrpcServer(cfg *Config) *grpc.Server {
-	opts := makeMiddlewareInterceptor(cfg)
-	return grpc.NewServer(opts...)
+type httpServer struct {
+	s    *http.Server
+	lis  net.Listener
+	addr string
+	None bool // 标记没有设置port，不想启动http服务时的情况
+}
+
+type grpcServer struct {
+	s    *grpc.Server
+	lis  net.Listener
+	addr string
+	None bool // 标记没有设置port，不想启动grpc服务时的情况
+}
+
+func (s *Server) GrpcAddr() string {
+	return fmt.Sprintf("%s:%d", s.cfg.Server.Host, s.cfg.Server.GrpcPort)
+}
+
+func (s *Server) HttpAddr() string {
+	return fmt.Sprintf("%s:%d", s.cfg.Server.Host, s.cfg.Server.HttpPort)
+}
+
+func initHttpServer(cfg *Config) (*httpServer, error) {
+	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.HttpPort)
+	hs := &httpServer{
+		addr: addr,
+		s:    &http.Server{},
+	}
+
+	if cfg.Server.HttpPort == 0 {
+		hs.None = true
+		return hs, nil
+	}
+
+	l, err := net.Listen("tcp", addr)
+	if err != nil {
+		hs.None = true
+		return hs, err
+	}
+
+	hs.lis = l
+	return hs, nil
+}
+
+func initGrpcServer(cfg *Config) (*grpcServer, error) {
+	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.GrpcPort)
+	gs := &grpcServer{
+		addr: addr,
+		s:    grpc.NewServer(makeMiddlewareInterceptor(cfg)...),
+	}
+	if cfg.Server.GrpcPort == 0 {
+		gs.None = true
+		return gs, nil
+	}
+
+	l, err := net.Listen("tcp", addr)
+	if err != nil {
+		gs.None = true
+		return gs, err
+	}
+
+	gs.lis = l
+	return gs, nil
 }
 
 // makeMiddlewareInterceptor Sending unary almost always faster. Use streaming to send big files.
@@ -73,21 +134,20 @@ func makeMiddlewareInterceptor(cfg *Config) []grpc.ServerOption {
 	}
 }
 
-func (s *Server) GrpcAddr() string {
-	return fmt.Sprintf("%s:%d", s.cfg.Server.Host, s.cfg.Server.Port)
-}
-
-func (s *Server) HttpAddr() string {
-	return fmt.Sprintf("%s:%d", s.cfg.Server.Host, s.cfg.Server.HttpPort)
-}
-
 func (s *Server) GrpcServer() *grpc.Server {
-	return s.server
+	return s.gs.s
+}
+
+func (s *Server) HttpServer() *http.Server {
+	return s.hs.s
 }
 
 func (s *Server) Serve(options ...ServeOption) error {
-	if s == nil || s.server == nil {
+	if s == nil {
 		return fmt.Errorf("grpc server is nil")
+	}
+	if s.gs.None && s.hs.None {
+		return fmt.Errorf("both grpc and http server are nil")
 	}
 
 	if s.Err != nil {
@@ -105,13 +165,6 @@ func (s *Server) Serve(options ...ServeOption) error {
 		}
 	}()
 
-	// init listener
-	lis, err := net.Listen("tcp", s.GrpcAddr())
-	if err != nil {
-		s.Log.Error("grpc listen with addr [%s] failed, error: ", err.Error())
-		return err
-	}
-
 	// 只有非dev环境，并且开关打开，才执行consul的注册和metrics的监听
 	if s.cfg.Consul.Enabled {
 		if err := registerConsul(s.cfg); err != nil {
@@ -120,7 +173,6 @@ func (s *Server) Serve(options ...ServeOption) error {
 	}
 
 	if s.cfg.Metrics.Enabled {
-		grpc_prometheus.Register(s.server)
 		http.Handle("/metrics", promhttp.Handler())
 	}
 
@@ -132,17 +184,42 @@ func (s *Server) Serve(options ...ServeOption) error {
 		}()
 	}
 
-	reflection.Register(s.server)
-	go func() {
-		err := s.server.Serve(lis)
-		if err != nil {
-			s.Log.Error("grpc server serve failed, error: %s", err.Error())
-		}
-	}()
+	s.serveGrpc()
+	s.serveHttp()
 
 	onExit(onSignal())
 
 	return nil
+}
+
+func (s *Server) serveGrpc() {
+	if s.gs.None {
+		return
+	}
+
+	if s.cfg.Metrics.Enabled {
+		grpc_prometheus.Register(s.gs.s)
+	}
+
+	reflection.Register(s.gs.s)
+	go func() {
+		err := s.gs.s.Serve(s.gs.lis)
+		if err != nil {
+			s.Log.Error("grpc server serve failed, error: %s", err.Error())
+		}
+	}()
+}
+
+func (s *Server) serveHttp() {
+	if s.hs.None {
+		return
+	}
+	go func() {
+		err := s.hs.s.Serve(s.hs.lis)
+		if err != nil {
+			s.Log.Error("http server serve failed, error: %s", err.Error())
+		}
+	}()
 }
 
 type ServeOption struct {

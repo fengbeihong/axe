@@ -1,8 +1,9 @@
 package rpc
 
 import (
-	_ "go.uber.org/automaxprocs"
 	"os"
+
+	_ "go.uber.org/automaxprocs"
 )
 
 func init() {
@@ -11,7 +12,7 @@ func init() {
 	os.Setenv("GODEBUG", "netdns=go")
 }
 
-func InitRpc(filePath string, opts ...InitOption) (*Server, error) {
+func NewServer(filePath string, opts ...InitOption) (*Server, error) {
 	s := &Server{
 		cfg: initConfig(filePath),
 		Log: defaultLogger(),
@@ -29,8 +30,14 @@ func InitRpc(filePath string, opts ...InitOption) (*Server, error) {
 
 	initDBClient(s)
 
-	// init grpc server
-	s.server = initGrpcServer(s.cfg)
+	s.gs, s.Err = initGrpcServer(s.cfg)
+	if s.Err != nil {
+		return s, s.Err
+	}
+	s.hs, s.Err = initHttpServer(s.cfg)
+	if s.Err != nil {
+		return s, s.Err
+	}
 
 	return s, s.Err
 }

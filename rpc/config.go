@@ -38,7 +38,7 @@ type Config struct {
 type serverConfig struct {
 	ServiceName string `toml:"service_name"`
 	Host        string `toml:"host"`
-	Port        int    `toml:"port"`
+	GrpcPort    int    `toml:"grpc_port"`
 	HttpPort    int    `toml:"http_port"`
 }
 
