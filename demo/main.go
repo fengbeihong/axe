@@ -75,14 +75,23 @@ func getCurrentFilePath() string {
 }
 func main() {
 	cfgPath := path.Join(path.Dir(getCurrentFilePath()), "rpc.toml")
+
+	// grpc server自定义生成
+	// TODO http server也自定义生成
 	s, _ := rpc.InitRpc(cfgPath, rpc.WithLogger(&MyLogger{}))
 	// 也可以使用默认logger
 	// s := rpc.InitRpc("./rpc.toml")
 
 	// register rpc
+	// 注册rpc server只能传grpc server对象
+	// TODO 所以注册http server需要再单独出一个register方法，还是要人手动调用
 	pb.RegisterEchoServiceServer(s.GrpcServer(), &echoServer{})
 
+	// TODO 这些代码，应该直接在pb.go里生成，放在http的register方法里
+	// TODO wrapper方法，最终调用的是echoServer的Echo
 	http.HandleFunc("/echo", EchoWithHttpWrapper)
+
+	// TODO 由上面的http server提供一个类似于grpc server的serve方法
 	go http.ListenAndServe(s.HttpAddr(), nil)
 
 	// 调用client的例子

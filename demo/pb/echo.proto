@@ -1,7 +1,7 @@
 syntax = "proto3";
 package echopb;
 
-import "google/api/annotations.proto";
+option go_package = "./pb";
 
 message EchoRequest{
     string value = 1;

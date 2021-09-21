@@ -2,8 +2,8 @@
 
 
 go install \
-    github.com/grpc-ecosystem/grpc-gateway/protoc-gen-swagger \
-    github.com/golang/protobuf/protoc-gen-go \
+    google.golang.org/protobuf/cmd/protoc-gen-go@v1.26 \
+    google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.1 \
 
 
 dir=$(mktemp -d)
