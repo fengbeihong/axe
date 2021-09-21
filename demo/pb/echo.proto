@@ -1,5 +1,4 @@
 syntax = "proto3";
-package echopb;
 
 option go_package = "./pb";
 

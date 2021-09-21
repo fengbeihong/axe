@@ -72,16 +72,10 @@ func generateFileContent(gen *protogen.Plugin, file *protogen.File, g *protogen.
 func genHttpService(gen *protogen.Plugin, file *protogen.File, g *protogen.GeneratedFile, service *protogen.Service) {
 	serverType := service.GoName + "Server"
 
-	handlerNames := make([]string, 0, len(service.Methods))
+	g.P("func Register", service.GoName, "HttpServer(srv ", serverType, ") {")
 	for _, method := range service.Methods {
 		hname := genHttpServerMethod(gen, file, g, method)
-		handlerNames = append(handlerNames, hname)
-	}
-
-
-	g.P("func Register", service.GoName, "HttpServer(srv ", serverType, ") {")
-	for i, hname := range handlerNames {
-		g.P(httpPackage.Ident("HandleFunc"), "(", strconv.Quote(fmt.Sprintf("/%s/%s", service.Desc.FullName(), service.Methods[i].Desc.Name())), ", ", hname, ")")
+		g.P(httpPackage.Ident("HandleFunc"), "(", strconv.Quote(fmt.Sprintf("/%s/%s", service.Desc.FullName(), method.Desc.Name())), ", ", hname, ")")
 	}
 	g.P("}")
 	g.P()
@@ -91,7 +85,7 @@ func genHttpServerMethod(gen *protogen.Plugin, file *protogen.File, g *protogen.
 	service := method.Parent
 	hname := fmt.Sprintf("_%s_%s_Http_Handler", service.GoName, method.GoName)
 
-	g.P("func ", hname, "(w ", httpPackage.Ident("ResponseWriter"), ", req *", httpPackage.Ident("Request"), ") {")
+	g.P(hname, " := func(w ", httpPackage.Ident("ResponseWriter"), ", req *", httpPackage.Ident("Request"), ") {")
 	g.P("data, err := ", ioutilPackage.Ident("ReadAll"), "(req.Body)")
 	g.P("defer req.Body.Close()")
 	g.P("if err != nil {")
@@ -108,8 +102,7 @@ func genHttpServerMethod(gen *protogen.Plugin, file *protogen.File, g *protogen.
 	g.P("}")
 	g.P("}")
 
-	g.P("var s ", service.GoName, "Server")
-	g.P("respData, err := s.", method.GoName, "(context.Background(), &reqData)")
+	g.P("respData, err := srv.", method.GoName, "(context.Background(), &reqData)")
 	g.P("if err != nil {")
 	g.P("w.Write([]byte(err.Error()))")
 	g.P("return")

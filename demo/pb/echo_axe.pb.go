@@ -34,7 +34,7 @@ func NewEchoServiceClient(cc grpc.ClientConnInterface) EchoServiceClient {
 
 func (c *echoServiceClient) Echo(ctx context.Context, in *EchoRequest, opts ...grpc.CallOption) (*EchoResponse, error) {
 	out := new(EchoResponse)
-	err := c.cc.Invoke(ctx, "/echopb.EchoService/Echo", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/EchoService/Echo", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +79,7 @@ func _EchoService_Echo_Handler(srv interface{}, ctx context.Context, dec func(in
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/echopb.EchoService/Echo",
+		FullMethod: "/EchoService/Echo",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(EchoServiceServer).Echo(ctx, req.(*EchoRequest))
@@ -91,7 +91,7 @@ func _EchoService_Echo_Handler(srv interface{}, ctx context.Context, dec func(in
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var EchoService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "echopb.EchoService",
+	ServiceName: "EchoService",
 	HandlerType: (*EchoServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
@@ -103,35 +103,34 @@ var EchoService_ServiceDesc = grpc.ServiceDesc{
 	Metadata: "pb/echo.proto",
 }
 
-func _EchoService_Echo_Http_Handler(w http.ResponseWriter, req *http.Request) {
-	data, err := ioutil.ReadAll(req.Body)
-	defer req.Body.Close()
-	if err != nil {
-		w.Write([]byte(err.Error()))
-		return
-	}
-	var reqData EchoRequest
-	if len(data) != 0 {
-		err = json.Unmarshal(data, &reqData)
+func RegisterEchoServiceHttpServer(srv EchoServiceServer) {
+	_EchoService_Echo_Http_Handler := func(w http.ResponseWriter, req *http.Request) {
+		data, err := ioutil.ReadAll(req.Body)
+		defer req.Body.Close()
 		if err != nil {
 			w.Write([]byte(err.Error()))
 			return
 		}
+		var reqData EchoRequest
+		if len(data) != 0 {
+			err = json.Unmarshal(data, &reqData)
+			if err != nil {
+				w.Write([]byte(err.Error()))
+				return
+			}
+		}
+		respData, err := srv.Echo(context.Background(), &reqData)
+		if err != nil {
+			w.Write([]byte(err.Error()))
+			return
+		}
+		b, err := json.Marshal(respData)
+		if err != nil {
+			w.Write([]byte(err.Error()))
+			return
+		}
+		w.Write(b)
 	}
-	var s EchoServiceServer
-	respData, err := s.Echo(context.Background(), &reqData)
-	if err != nil {
-		w.Write([]byte(err.Error()))
-		return
-	}
-	b, err := json.Marshal(respData)
-	if err != nil {
-		w.Write([]byte(err.Error()))
-		return
-	}
-	w.Write(b)
-}
 
-func RegisterEchoServiceHttpServer(srv EchoServiceServer) {
-	http.HandleFunc("/echopb.EchoService/Echo", _EchoService_Echo_Http_Handler)
+	http.HandleFunc("/EchoService/Echo", _EchoService_Echo_Http_Handler)
 }
