@@ -7,7 +7,7 @@
 并且，可以同时注册grpc接口和http接口，和grpc-gateway不同，不经过proxy转发，也不需要在proto文件额外定义。
 
 ### 安装protoc-gen-go-axe
-自定义的`protoc-gen-go`插件
+> 自定义的`protoc-gen-go`插件
 
 `protoc-gen-go-axe`是基于`protoc-gen-go-grpc`v1.1版本修改的，参考 https://github.com/grpc/grpc-go/tree/cmd/protoc-gen-go-grpc%2Fv1.1.0/cmd/protoc-gen-go-grpc
 
@@ -69,9 +69,7 @@ go run main.go
 ```
 
 ##### 测试
-
-`/EchoService/Echo`是用`protoc-gen-go-axe`工具自动生成的path名称，和`proto`文件里的定义对应
-
+> `/EchoService/Echo`是用`protoc-gen-go-axe`工具自动生成的path名称，和`proto`文件里的定义对应
 ```
 curl -XPOST --data '{"value":"testvalue"}' http://localhost:9901/EchoService/Echo
 ```
