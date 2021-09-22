@@ -67,8 +67,6 @@ func getCurrentFilePath() string {
 func main() {
 	cfgPath := path.Join(path.Dir(getCurrentFilePath()), "rpc.toml")
 
-	// 也可以使用默认logger
-	// s, _ := rpc.InitRpc(cfgPath)
 	s, err := rpc.NewServer(cfgPath, rpc.WithLogger(&MyLogger{}))
 	if err != nil {
 		log.Fatalf("failed to new server: %s", err.Error())

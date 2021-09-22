@@ -1,11 +1,24 @@
-### 安装依赖
+### 说明
 
-##### protoc和swagger的生成脚本
+自研的轻量级rpc框架，没有加对多种组件的适配，比如metrics就是prometheus，trace就是jaeger。
+
+主要特点就是把所有可能用到的配置项尽量集中到配置文件，main函数只用少量代码就可以启动服务。
+
+并且，可以同时注册grpc接口和http接口，和grpc-gateway不同，不经过proxy转发，也不需要在proto文件额外定义。
+
+### 安装protoc-gen-go-axe
+自定义的`protoc-gen-go`插件
+
+`protoc-gen-go-axe`是基于`protoc-gen-go-grpc`v1.1版本修改的，参考 https://github.com/grpc/grpc-go/tree/cmd/protoc-gen-go-grpc%2Fv1.1.0/cmd/protoc-gen-go-grpc
+
 ```
-go install \
-    github.com/grpc-ecosystem/grpc-gateway/protoc-gen-swagger \
-    github.com/golang/protobuf/protoc-gen-go
+go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.26
+go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.1
+
+go install github.com/fengbeihong/cmd/protoc-gen-go-axe
 ```
+
+### 安装其他依赖
 
 ##### swagger
 ```
@@ -32,14 +45,11 @@ Git clone https://github.com/golang/text
 Git clone https://github.com/golang/sys
 ```
 
-### 执行生成命令
-> 会生成 `.pb.go` `.pb.gw.go` `.swagger.json` 三种文件
+### 生成pb文件
+> 会生成 `xxx.pb.go` `xxx_axe.pb.go` 两种文件
 ```
-PB_PATH=$GOPATH/src/github.com/fengbeihong/rpc-go/demo/pb
-cd $PB_PATH
-
-protoc -I $GOPATH/src -I $PB_PATH/ --go_out=plugins=grpc:$PB_PATH/ $PB_PATH/echo.proto
-protoc -I $GOPATH/src -I $PB_PATH/ --swagger_out=logtostderr=true:$PB_PATH/ $PB_PATH/echo.proto
+cd $GOPATH/src/github.com/fengbeihong/axe/demo/
+./gen_pb.sh
 ```
 
 ##### 启动 swagger UI
@@ -47,23 +57,27 @@ protoc -I $GOPATH/src -I $PB_PATH/ --swagger_out=logtostderr=true:$PB_PATH/ $PB_
 > 也可以使用 https://editor.swagger.io/
 
 ```
-cd $GOPATH/src/github.com/fengbeihong/rpc-go/demo/pb
-swagger serve --host=0.0.0.0 --port=9000 ./echo.swagger.json
+cd $GOPATH/src/github.com/fengbeihong/axe/demo
+swagger serve --host=0.0.0.0 --port=9000 ./pb/echo.swagger.json
 ```
 
 ##### 启动demo服务
 > toml文件规范 https://github.com/LongTengDao/TOML/
 ```
-cd $GOPATH/src/github.com/fengbeihong/rpc-go/demo/
+cd $GOPATH/src/github.com/fengbeihong/axe/demo/
 go run main.go
 ```
 
 ##### 测试
+
+`/EchoService/Echo`是用`protoc-gen-go-axe`工具自动生成的path名称，和`proto`文件里的定义对应
+
 ```
-curl -XPOST --data '{"value":"testvalue"}' http://localhost:9901/v1/example/echo
+curl -XPOST --data '{"value":"testvalue"}' http://localhost:9901/EchoService/Echo
 ```
 
 ### TODO
-- 自定义protoc-gen-go工具，可以通过普通的proto文件，同时生成grpc的操作方法和启动http服务的操作方法
-- swagger集成到服务内，只要启动服务，直接访问url即可获取接口描述信息
-- 使用endpoint调用依赖服务时的负载均衡功能
+- [x] 自定义protoc-gen-go工具，可以通过普通的proto文件，除了生成grpc的code之外，还可以生成注册http接口的pattern的code.
+- [ ] swagger集成到服务内，只要启动服务，直接访问url即可获取接口描述信息，可以利用pb工具
+- [ ] 使用endpoint调用依赖服务时的负载均衡功能
+
