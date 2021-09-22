@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"net/http"
 	"path"
 	"runtime"
 	"time"
@@ -18,7 +19,27 @@ type echoServer struct {
 }
 
 func (s *echoServer) Echo(ctx context.Context, req *pb.EchoRequest) (*pb.EchoResponse, error) {
-	return &pb.EchoResponse{Value: req.GetValue()}, nil
+	return &pb.EchoResponse{Value: "echo1_" + req.GetValue()}, nil
+}
+
+func (s *echoServer) Echo2(ctx context.Context, req *pb.EchoRequest) (*pb.EchoResponse, error) {
+	return &pb.EchoResponse{Value: "echo2_" + req.GetValue()}, nil
+}
+
+func middleware1(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		log.Println("middleware1 - Before Handler")
+		next.ServeHTTP(w, r)
+		log.Println("middleware1 - After Handler")
+	})
+}
+
+func middleware2(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		log.Println("middleware2 - Before Handler")
+		next.ServeHTTP(w, r)
+		log.Println("middleware2 - After Handler")
+	})
 }
 
 /////////////////////////////
@@ -56,7 +77,7 @@ func main() {
 	// register rpc
 	pb.RegisterEchoServiceServer(s.GrpcServer(), &echoServer{})
 	// register http, pattern和handler会自动生成
-	pb.RegisterEchoServiceHttpServer(s.HttpServer(), &echoServer{})
+	pb.RegisterEchoServiceHttpServer(s.HttpServer(), &echoServer{}, []pb.MiddlewareFunc{middleware1, middleware2}...)
 
 	// 调用client的例子
 	//go clientExample()

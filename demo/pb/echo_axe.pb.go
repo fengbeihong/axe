@@ -22,6 +22,7 @@ const _ = grpc.SupportPackageIsVersion7
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type EchoServiceClient interface {
 	Echo(ctx context.Context, in *EchoRequest, opts ...grpc.CallOption) (*EchoResponse, error)
+	Echo2(ctx context.Context, in *EchoRequest, opts ...grpc.CallOption) (*EchoResponse, error)
 }
 
 type echoServiceClient struct {
@@ -41,11 +42,21 @@ func (c *echoServiceClient) Echo(ctx context.Context, in *EchoRequest, opts ...g
 	return out, nil
 }
 
+func (c *echoServiceClient) Echo2(ctx context.Context, in *EchoRequest, opts ...grpc.CallOption) (*EchoResponse, error) {
+	out := new(EchoResponse)
+	err := c.cc.Invoke(ctx, "/EchoService/Echo2", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // EchoServiceServer is the server API for EchoService service.
 // All implementations must embed UnimplementedEchoServiceServer
 // for forward compatibility
 type EchoServiceServer interface {
 	Echo(context.Context, *EchoRequest) (*EchoResponse, error)
+	Echo2(context.Context, *EchoRequest) (*EchoResponse, error)
 	mustEmbedUnimplementedEchoServiceServer()
 }
 
@@ -55,6 +66,9 @@ type UnimplementedEchoServiceServer struct {
 
 func (UnimplementedEchoServiceServer) Echo(context.Context, *EchoRequest) (*EchoResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Echo not implemented")
+}
+func (UnimplementedEchoServiceServer) Echo2(context.Context, *EchoRequest) (*EchoResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Echo2 not implemented")
 }
 func (UnimplementedEchoServiceServer) mustEmbedUnimplementedEchoServiceServer() {}
 
@@ -87,6 +101,24 @@ func _EchoService_Echo_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
+func _EchoService_Echo2_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EchoRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(EchoServiceServer).Echo2(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/EchoService/Echo2",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(EchoServiceServer).Echo2(ctx, req.(*EchoRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // EchoService_ServiceDesc is the grpc.ServiceDesc for EchoService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -98,12 +130,18 @@ var EchoService_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "Echo",
 			Handler:    _EchoService_Echo_Handler,
 		},
+		{
+			MethodName: "Echo2",
+			Handler:    _EchoService_Echo2_Handler,
+		},
 	},
 	Streams:  []grpc.StreamDesc{},
 	Metadata: "pb/echo.proto",
 }
 
-func RegisterEchoServiceHttpServer(s *http.Server, srv EchoServiceServer) {
+type MiddlewareFunc func(http.Handler) http.Handler
+
+func RegisterEchoServiceHttpServer(s *http.Server, srv EchoServiceServer, middlewares ...MiddlewareFunc) {
 	mux := http.NewServeMux()
 
 	_EchoService_Echo_Http_Handler := func(w http.ResponseWriter, req *http.Request) {
@@ -133,7 +171,46 @@ func RegisterEchoServiceHttpServer(s *http.Server, srv EchoServiceServer) {
 		}
 		w.Write(b)
 	}
-	mux.HandleFunc("/EchoService/Echo", _EchoService_Echo_Http_Handler)
+	var _EchoService_Echo_HandlerFunc http.Handler
+	_EchoService_Echo_HandlerFunc = http.Handler(http.HandlerFunc(_EchoService_Echo_Http_Handler))
+	for _, m := range middlewares {
+		_EchoService_Echo_HandlerFunc = m(_EchoService_Echo_HandlerFunc)
+	}
+	mux.Handle("/EchoService/Echo", _EchoService_Echo_HandlerFunc)
+
+	_EchoService_Echo2_Http_Handler := func(w http.ResponseWriter, req *http.Request) {
+		data, err := ioutil.ReadAll(req.Body)
+		defer req.Body.Close()
+		if err != nil {
+			w.Write([]byte(err.Error()))
+			return
+		}
+		var reqData EchoRequest
+		if len(data) != 0 {
+			err = json.Unmarshal(data, &reqData)
+			if err != nil {
+				w.Write([]byte(err.Error()))
+				return
+			}
+		}
+		respData, err := srv.Echo2(context.Background(), &reqData)
+		if err != nil {
+			w.Write([]byte(err.Error()))
+			return
+		}
+		b, err := json.Marshal(respData)
+		if err != nil {
+			w.Write([]byte(err.Error()))
+			return
+		}
+		w.Write(b)
+	}
+	var _EchoService_Echo2_HandlerFunc http.Handler
+	_EchoService_Echo2_HandlerFunc = http.Handler(http.HandlerFunc(_EchoService_Echo2_Http_Handler))
+	for _, m := range middlewares {
+		_EchoService_Echo2_HandlerFunc = m(_EchoService_Echo2_HandlerFunc)
+	}
+	mux.Handle("/EchoService/Echo2", _EchoService_Echo2_HandlerFunc)
 
 	s.Handler = mux
 }

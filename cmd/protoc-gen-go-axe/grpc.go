@@ -73,16 +73,28 @@ func generateFileContent(gen *protogen.Plugin, file *protogen.File, g *protogen.
 func genHttpService(gen *protogen.Plugin, file *protogen.File, g *protogen.GeneratedFile, service *protogen.Service) {
 	serverType := service.GoName + "Server"
 
-	g.P("func Register", service.GoName, "HttpServer(s *", httpPackage.Ident("Server"), ",srv ", serverType, ") {")
+	g.P("type MiddlewareFunc func(", httpPackage.Ident("Handler"), ") ", httpPackage.Ident("Handler"))
+	g.P()
 
+	g.P("func Register", service.GoName, "HttpServer(s *", httpPackage.Ident("Server"), ",srv ", serverType, ", middlewares ...MiddlewareFunc) {")
 	g.P("mux := ", httpPackage.Ident("NewServeMux"), "()")
 	g.P()
 
 	for _, method := range service.Methods {
 		hname := genHttpServerMethod(gen, file, g, method)
-		g.P("mux.HandleFunc(", strconv.Quote(fmt.Sprintf("/%s/%s", service.Desc.FullName(), method.Desc.Name())), ", ", hname, ")")
+
+		hf := fmt.Sprintf("_%s_%s_HandlerFunc", service.GoName, method.GoName)
+		g.P("var ", hf, " ", httpPackage.Ident("Handler"))
+
+		g.P(hf, " = ", httpPackage.Ident("Handler"), "(", httpPackage.Ident("HandlerFunc"), "(", hname, "))")
+		g.P("for _, m := range middlewares {")
+		g.P(hf, " = m(", hf, ")")
+		g.P("}")
+
+		g.P("mux.Handle(", strconv.Quote(fmt.Sprintf("/%s/%s", service.Desc.FullName(), method.Desc.Name())), ", ", hf, ")")
 		g.P()
 	}
+
 	g.P("s.Handler = mux")
 	g.P("}")
 	g.P()
