@@ -79,7 +79,8 @@ type clientConfig struct {
 	RetryTimes   uint   `toml:"retry_times"`       // 重试次数
 	RetryTimeout int    `toml:"per_retry_timeout"` // 每次调用(包含第一次请求)的超时
 
-	EndpointsArr []string `toml:"-"`
+	EndpointStrList []string  `toml:"-"`
+	Balancer        *Balancer `toml:"-"`
 }
 
 type redisConfig struct {

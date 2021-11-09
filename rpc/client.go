@@ -19,7 +19,7 @@ func init() {
 func initRpcClient(s *Server) {
 	for _, item := range s.cfg.RpcClients {
 		if item.CallType == callTypeLocal {
-			if err := item.checkEndpoints(); err != nil {
+			if err := item.loadEndpoints(); err != nil {
 				s.Log.Error(err.Error())
 				continue
 			}
@@ -31,20 +31,34 @@ func initRpcClient(s *Server) {
 
 // load balancer
 func (c *clientConfig) endpointByBalancer() string {
-	// 暂时没有实现负载均衡
-	if len(c.EndpointsArr) == 0 {
+	// 暂时只有一种roundrobin负载均衡策略
+	if len(c.EndpointStrList) == 0 {
 		return ""
 	}
-	return c.EndpointsArr[0]
+	if c.Balancer == nil {
+		return c.EndpointStrList[0]
+	}
+	v, err := c.Balancer.Pick()
+	if err != nil {
+		return c.EndpointStrList[0]
+	}
+	return v.(string)
 }
 
-func (c *clientConfig) checkEndpoints() error {
+func (c *clientConfig) loadEndpoints() error {
 	arr := strings.Split(c.Endpoints, ",")
 	if len(arr) == 0 {
 		return fmt.Errorf("check endpoints failed, empty ip address, service_name: %s, endpoints: %s", c.ServiceName, c.Endpoints)
 	}
 
-	c.EndpointsArr = arr
+	var l []interface{}
+	for _, item := range arr {
+		l = append(l, item)
+	}
+
+	// load balancer
+	c.Balancer = NewBalancer(l)
+	c.EndpointStrList = arr
 	return nil
 }
 
